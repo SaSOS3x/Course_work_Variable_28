@@ -1,7 +1,6 @@
 /*
 ******************************************************************
-*     C++ Mthematical method for calculate any mathematical      *
-*               infinity vars for Probability theory             *
+*     C Mathematical method for probability calculations        *
 *                                                                *
 * Author: Alexander Dmitriyevich                                 *
 * url: https://vk.com/sasha314                                   *
@@ -9,237 +8,126 @@
 ******************************************************************
 */
 
-/*
-**********************************************************************************
-*                                                                                *
-* For compile this application use this command:                                 *
-* Windows: clang++ main.cpp -o main.exe                                          *
-*                                                                                *
-**********************************************************************************
-*/
+#include <stdio.h>
+#include <math.h>
 
-// Include librarities
+// Базовый тип для функции плотности
+typedef double (*MathFunc)(double);
 
-#include <iostream>
-#include <string>
-#include <cmath>
-#include <list>
-#include <sstream>
-#include <vector>
-#include <stdexcept>
-#include "exprtk.hpp"
-
-struct func
-{
-    double x = 0;
-    exprtk::expression<double> expression;               // function F(x)
-    exprtk::parser<double> parser;                       // Parser
-
-    bool set_function(const std::string& expr_str)       // Installing a function from a string (example, "x^2 + sin(x)")
-    {
-        exprtk::symbol_table<double> symbol_table;
-        symbol_table.add_variable("x", x);               // Variable x
-        expression.register_symbol_table(symbol_table);
-
-        return parser.compile(expr_str, expression);     // Compile function
-    }
-
-    double calculate_Fx()                                // Calculate F(x)
-    {
-        return expression.value();
-    }
+// Структура для работы с функцией
+struct Func {
+    MathFunc fx;    // Указатель на выбранную функцию
+    double x;       // Текущее значение аргумента
 };
 
-std::vector<float> InputValues(){
-    std::vector<float> numbers;
-    std::string input;
+// Примеры различных плотностей распределения, задаются жёстко внутри кода, т.к. ввод со строки требует парсер, но это не в ходит в требования задания
+static double formula_exp(double x) { return exp(-x); }                          // Экспоненциальное
+static double formula_norm(double x) { return exp(-x*x/2); }                     // Нормальное
+static double formula_uniform(double x) { return x >= 0 && x <= 1 ? 1.0 : 0.0; } // Равномерное
 
-    // Entering a line from the console
-    std::cout << "Insert iteration (example: 1e-2) and Insert epsilo (example: 1e-2): ";
-    std::getline(std::cin, input);
+static double formula_example_one(double x) { return x - (x*x*x)/4; }            // Пример 1
+static double formula_example_two(double x) { return 0.5 * sinl(x); }            // Пример 2   
 
-    // Splitting the string into numbers
-    std::istringstream iss(input);
-    float num;
-    int count = 0;
-
-    // Extract the first two numbers
-    while (iss >> num && count < 2) {
-        numbers.push_back(num);
-        count++;
-    }
-
-    // Checking that there are enough numbers
-    if (count < 2) {
-        std::cout << "In the string less than two numbers!\n";
-        return {0};
-    }
-
-    // Output vector
-    std::cout << "Values: ";
-    for (const auto& n : numbers) {
-        std::cout << n << " ";
-    }
-
-    std::cout << "\n";
-
-    return numbers;
+// Ввод шага интегрирования и точности
+int InputValues(float* values) {
+    printf("Insert iteration and epsilon (ex: 0.01 0.001): ");
+    return scanf("%f %f", &values[0], &values[1]) == 2;
 }
 
-std::vector<float> InputList(){
-    std::vector<float> numbers;
-    std::string input;
-
-    // Entering a line from the console
-    std::cout << "Insert interval, that function > 0: ";
-    std::getline(std::cin, input);
-
-    // Splitting the string into numbers
-    std::istringstream iss(input);
-    float num;
-    int count = 0;
-
-    // Extract the first two numbers
-    while (iss >> num && count < 2) {
-        numbers.push_back(num);
-        count++;
-    }
-
-    // Checking that there are enough numbers
-    if (count < 2) {
-        std::cout << "In the string less than two numbers!\n";
-        return {0};
-    }
-
-    // Output vector
-    std::cout << "Vector: ";
-    for (const auto& n : numbers) {
-        std::cout << n << " ";
-    }
-
-    std::cout << "\n";
-
-    return numbers;
+// Ввод интервала для интегрирования, задаётся пользователем
+int InputInterval(float* interval) {
+    printf("Insert interval (ex: 0 2): ");
+    return scanf("%f %f", &interval[0], &interval[1]) == 2;
 }
 
-double Integrate(std::vector<float> interval, float iter, double eps){
-    /*
-    ********************************************
-    *                                          *
-    * newfunc - is a struct object of function *
-    *                                          *
-    * interval - is a vector who has have a 2  *
-    * numbers, example: [0, 2]                 *
-    *                                          *
-    * iter - is a iterate variable             *
-    *                                          *
-    * eps - is a epsilo                        *
-    *                                          *
-    ********************************************
-    */
+// Выбор функции
+int SelectFunction(MathFunc* func) {
+    printf("\nSelect probability distribution:\n");
+    printf("1. Exponential (e^-x)\n");
+    printf("2. Normal (e^(-x^2/2))\n");
+    printf("3. Uniform [0,1]\n");
+    printf("4. Example 1 (x - (x*x*x)/4)\n");
+    printf("5. Example 2 ((1/2) * sin(x))\n");
+    printf("Your choice: ");
+    
+    int choice;
+    if(scanf("%d", &choice) != 1) return 0;
+    
+    switch(choice) {
+        case 1: *func = formula_exp; break;
+        case 2: *func = formula_norm; break;
+        case 3: *func = formula_uniform; break;
+        case 4: *func = formula_example_one; break;
+        case 5: *func = formula_example_two; break;
+        default: return 0;
+    }
+    return 1;
+}
 
-    func newfunc;
+void Integrate(Func f, float* interval, float iter, float eps) {
+    double integrate = 0.0;
+    double mode = 0.0;
+    double x = interval[0];
 
-    std::string user_expr;
+    // Вычисление интеграла плотности
+    while(x <= interval[1]) {
+        f.x = x;
+        double current = f.fx(f.x);
         
-    // Function input from the user
-    std::cout << "Enter the function (use 'x' as a variable): ";
-    std::getline(std::cin, user_expr);
-
-    // Setting the function
-    if (!newfunc.set_function(user_expr))
-    {
-        std::cerr << "An error in the formula!\n";
-        return 1;
-    }
-
-    // Set the variables
-    newfunc.x = interval[0];
-    double integrate = 0;
-    double mode = 0;
-    double func = 0;
-    
-    // Integrte function...
-    while (std::abs(newfunc.x) < interval[1]) {
-        func = newfunc.calculate_Fx();          // Calculate F(x)
-
-        // Checking properties...
-        if (func < 0){
-            std::cout << "The distribution function cannot take negative values." << "\n";
-            return 0;
+        if(current < 0.0) {
+            printf("Negative function value!\n");
+            return;
         }
 
-        integrate += func * iter;               // Integrate...
-        std::cout << "integrate: " << integrate << " x: " << newfunc.x << "\n";
+        integrate += current * iter;
 
-        // Checking a new mode
-        if (mode < func){
-            mode = func;
-        }
-        newfunc.x += iter;
-    }
-    
-    // Checking properties...
-    if (1 - std::abs(integrate) <= eps){
-        std::cout << "This function is a correct in that interval, integrate: " << integrate << " epsilo: " << eps << "\n";
-    } else {
-        std::cout << "This function is a not correct in that interval, integrate: " << integrate << " epsilo: " << eps << "\n";
-        return 0;
-    }
-    
-    std::cout << "Calculate M(x)..." << "\n";
-
-    newfunc.x = interval[0];                  // Ubdate x vriable in newfunc object -> func structure
-    double Mintegrate = 0;
-
-    // Clculate M(x)...
-    while (std::abs(newfunc.x) < interval[1]) {
-        Mintegrate += newfunc.x * newfunc.calculate_Fx() * iter;
-        std::cout << "integrate: " << Mintegrate << " x: " << newfunc.x << "\n";
-        newfunc.x += iter;
+        if(current > mode) mode = current;
+        x += iter;
     }
 
-    std::cout << "Calculate D(x)..." << "\n";
-
-    newfunc.x = interval[0];                  // Ubdate x vriable in newfunc object -> func structure
-    double Dintegrate = 0;
-
-    // Calculate D(x)...
-    while (std::abs(newfunc.x) < interval[1]) {
-        Dintegrate += std::pow(newfunc.x, 2) * newfunc.calculate_Fx() * iter;
-        std::cout << "integrate: " << Dintegrate << " x: " << newfunc.x << "\n";
-        newfunc.x += iter;
+    // Проверка условия нормировки
+    if(fabs(1.0 - integrate) > eps) {
+        printf("Invalid function. Integral: %.6f\n", integrate);
+        return;
     }
-    
-    Dintegrate = Dintegrate - std::pow(Mintegrate, 2);  // Finish the calculating
+    printf("Valid function. Integral: %.6f\n", integrate);
 
-    std::cout << "M(x) = " << Mintegrate << "\n" << "D(x) = " << Dintegrate << "\n" << "mode = " << mode << "\n";
-    
-    return 0;
+    // Вычисление характеристик M(x), D(x)
+    double M = 0.0, D = 0.0;
+    for(x = interval[0]; x <= interval[1]; x += iter) {
+        f.x = x;
+        double val = f.fx(x) * iter;
+        M += x * val;
+        D += x * x * val;
+    }
+    D -= M * M;
+
+    // Вывод результата
+    printf("\nResults:\n");
+    printf("M(x) = %.6f\n", M);
+    printf("D(x) = %.6f\n", D);
+    printf("Mode = %.6f\n", mode);
 }
 
-int main(){
-
-    // Set the interval
-    std::vector<float> interval = InputList();
-
-    try {
-        int value = interval.at(1);
-    } catch (const std::out_of_range& e){
-        std::cerr << "Error: " << "you don`t write a 2-nd number..." << "\n";
+int main() {
+    // Выбор функции распределения
+    MathFunc selected_func;
+    if(!SelectFunction(&selected_func)) {
+        printf("Invalid function selection!\n");
         return 1;
     }
 
-    // Set the values
-    std::vector<float> values = InputValues();
+    // Инициализация структуры функции
+    Func f = {selected_func, 0};
 
-    try {
-        int value = values.at(1);
-    } catch (const std::out_of_range& e){
-        std::cerr << "Error: " << "you don`t write a 2-nd number..." << "\n";
-        return 1;
-    }
+    // Ввод параметров
+    float interval[2];
+    if(!InputInterval(interval)) return 1;
 
-    // Integrate...
-    Integrate(interval, values[0], values[1]);
+    float values[2];
+    if(!InputValues(values)) return 1;
+
+    // Вычисление характеристик
+    Integrate(f, interval, values[0], values[1]);
+    return 0;
 }
