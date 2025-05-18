@@ -10,124 +10,116 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <iostream>
 
-// Базовый тип для функции плотности
-typedef double (*MathFunc)(double);
+// Базовый тип для функции плотности распределения
+typedef double (*MathFunc)(double); // Создание указателя
 
-// Структура для работы с функцией
 struct Func {
-    MathFunc fx;    // Указатель на выбранную функцию
-    double x;       // Текущее значение аргумента
+    MathFunc fx;  // Указатель на функцию
+    double x;     // Текущее значение аргумента
 };
 
-// Примеры различных плотностей распределения, задаются жёстко внутри кода, т.к. ввод со строки требует парсер, но это не в ходит в требования задания
-static double formula_exp(double x) { return exp(-x); }                          // Экспоненциальное
-static double formula_norm(double x) { return exp(-x*x/2); }                     // Нормальное
-static double formula_uniform(double x) { return x >= 0 && x <= 1 ? 1.0 : 0.0; } // Равномерное
+// Список доступных функций для указателя
+static double Func_exp(double x){ return exp(-x); }
+static double Func_norm(double x){ return exp(-x*x/2); }
 
-static double formula_example_one(double x) { return x - (x*x*x)/4; }            // Пример 1
-static double formula_example_two(double x) { return 0.5 * sinl(x); }            // Пример 2   
+// Функции примеры
+static double Func_example_one(double x){ return x - (pow(x, 3))/4; }
+static double Func_example_two(double x){ return 0.5 * sinl(x); }
 
-// Ввод шага интегрирования и точности
-int InputValues(float* values) {
-    printf("Insert iteration and epsilon (ex: 0.01 0.001): ");
-    return scanf("%f %f", &values[0], &values[1]) == 2;
+// Ввод шага итерирования и точности
+double InputValues(float* values){
+    std::cout << "Insert iteration and epsilon (ex: 1e-2 1e-3): ";
+
+    return scanf("%f %f", &values[0], &values[1]) == 2; // возвращает результат условия, 0 или 1
 }
 
-// Ввод интервала для интегрирования, задаётся пользователем
-int InputInterval(float* interval) {
-    printf("Insert interval (ex: 0 2): ");
-    return scanf("%f %f", &interval[0], &interval[1]) == 2;
+// Ввод интервала интегрирования (интервал определения функции распределения)
+double InputInterval(float* interval){
+    std::cout << "\nInsert interval (ex: 0 2): ";
+
+    return scanf("%f %f", &interval[0], &interval[1]) == 2; // возвращает результат условия, 0 или 1
 }
 
-// Выбор функции
+// Выбор функции распределения: Функция принимает адресс на указатель
 int SelectFunction(MathFunc* func) {
-    printf("\nSelect probability distribution:\n");
-    printf("1. Exponential (e^-x)\n");
-    printf("2. Normal (e^(-x^2/2))\n");
-    printf("3. Uniform [0,1]\n");
-    printf("4. Example 1 (x - (x*x*x)/4)\n");
-    printf("5. Example 2 ((1/2) * sin(x))\n");
-    printf("Your choice: ");
-    
+    std::cout << "\n" << "Select probability distribution:" << "\n";
+    std::cout << "1. Exponential (e^-x)" << "\n";
+    std::cout << "2. Normal (e^(-x^2/2))" << "\n";
+    std::cout << "3. Example 1 (x - (x*x*x)/4)" << "\n";
+    std::cout << "4. Example 2 ((1/2) * sin(x))" << "\n";
+
     int choice;
-    if(scanf("%d", &choice) != 1) return 0;
-    
+    if (scanf("%d", &choice) != 1) return 1; // Если количество ввода не равно 1, то возвращает 1
+
     switch(choice) {
-        case 1: *func = formula_exp; break;
-        case 2: *func = formula_norm; break;
-        case 3: *func = formula_uniform; break;
-        case 4: *func = formula_example_one; break;
-        case 5: *func = formula_example_two; break;
+        case 1: *func = Func_exp; break;
+        case 2: *func = Func_norm; break;
+        case 3: *func = Func_example_one; break;
+        case 4: *func = Func_example_two; break;
         default: return 0;
     }
+
     return 1;
 }
 
 void Integrate(Func f, float* interval, float iter, float eps) {
     double integrate = 0.0;
     double mode = 0.0;
-    double x = interval[0];
+    f.x = interval[0]; // 0 <- f.x, 1
 
-    // Вычисление интеграла плотности
-    while(x <= interval[1]) {
-        f.x = x;
-        double current = f.fx(f.x);
-        
-        if(current < 0.0) {
-            printf("Negative function value!\n");
-            return;
+    // Вычисление плотности вероятности функции на заданном интервале
+    for ( f.x = interval[0]; f.x <= interval[1]; f.x += iter ){ // f.x <= 1 <- interval[1] {0, 1 <- [1]}
+        double function = f.fx(f.x); // F(x) F - function, x - argument
+
+        if (function < 0.0){
+            std::cout << "Negative function value!" << "\n";
+            return; // Выход из функции
         }
 
-        integrate += current * iter;
+        integrate += function * iter;
 
-        if(current > mode) mode = current;
-        x += iter;
+        if(function > mode){
+            mode = integrate; // Нахождение моды
+        }
     }
 
-    // Проверка условия нормировки
-    if(fabs(1.0 - integrate) > eps) {
-        printf("Invalid function. Integral: %.6f\n", integrate);
-        return;
+    // Проверка сходимости
+    if (abs(1.0 - integrate) > eps){
+        std::cout << "Invalid function or interval. Integral: " << integrate << "\n";
+        return; // Выход из функции
     }
-    printf("Valid function. Integral: %.6f\n", integrate);
+    std::cout << "Function is valid, integral: " << integrate << "\n";
 
-    // Вычисление характеристик M(x), D(x)
+    // Вычисление M(x) и D(x):
     double M = 0.0, D = 0.0;
-    for(x = interval[0]; x <= interval[1]; x += iter) {
-        f.x = x;
-        double val = f.fx(x) * iter;
-        M += x * val;
-        D += x * x * val;
+    for (f.x = interval[0]; f.x <= interval[1]; f.x += iter){
+        M += f.x * f.fx(f.x) * iter;          // Вычисление M(x)
+        D += pow(f.x, 2) * f.fx(f.x) * iter;  // Вычисление D(x)
     }
-    D -= M * M;
+    D -= pow(M, 2);                           // Окончательное нахождение диспресии
 
-    // Вывод результата
-    printf("\nResults:\n");
-    printf("M(x) = %.6f\n", M);
-    printf("D(x) = %.6f\n", D);
-    printf("Mode = %.6f\n", mode);
+    // Вывод:
+    std::cout << "M(x) = " << M << "\n";
+    std::cout << "D(x) = " << D << "\n";
+    std::cout << "Mode = " << mode << "\n"; 
 }
 
-int main() {
-    // Выбор функции распределения
-    MathFunc selected_func;
-    if(!SelectFunction(&selected_func)) {
-        printf("Invalid function selection!\n");
-        return 1;
+int main(){
+    MathFunc select; // Указатель на функцию
+    if(!SelectFunction(&select)){
+        std::cout << "Invalid function selection!" << "\n";
+        return 0;
     }
 
-    // Инициализация структуры функции
-    Func f = {selected_func, 0};
+    Func f = {select, 0}; // Инициализация струткуры (функции)
+    
+    float values[2]; // Выделение памяти под статический массив типа float
+    if(!InputValues(values)) return 1; // Если возвращён 0, то !0 = 1 и программа завершается
 
-    // Ввод параметров
-    float interval[2];
-    if(!InputInterval(interval)) return 1;
-
-    float values[2];
-    if(!InputValues(values)) return 1;
-
-    // Вычисление характеристик
-    Integrate(f, interval, values[0], values[1]);
-    return 0;
+    float interval[2]; // Выделение памяти под статический массив типа float
+    if(!InputInterval(interval)) return 1; // Если возвращён 0, то !0 = 1 и программа завершается
+    
+    Integrate(f, interval, values[0], values[1]); // Вычисление...
 }
