@@ -1,6 +1,6 @@
 /*
 ******************************************************************
-*     C Mathematical method for probability calculations        *
+*      C Mathematical method for probability calculations        *
 *                                                                *
 * Author: Alexander Dmitriyevich                                 *
 * url: https://vk.com/sasha314                                   *
@@ -16,7 +16,7 @@
 typedef double (*MathFunc)(double); // Создание указателя
 
 struct Func {
-    MathFunc fx;  // Указатель на функцию
+    const MathFunc fx;  // Указатель на функцию
     double x;     // Текущее значение аргумента
 };
 
@@ -64,7 +64,7 @@ int SelectFunction(MathFunc* func) {
     return 1;
 }
 
-void Integrate(Func f, float* interval, float iter, float eps) {
+void Integrate(Func f, const float* interval, const float iter, const float eps) {
     double integrate = 0.0;
     double mode = 0.0;
     f.x = interval[0]; // 0 <- f.x, 1
@@ -106,7 +106,7 @@ void Integrate(Func f, float* interval, float iter, float eps) {
     std::cout << "Mode = " << mode << "\n"; 
 }
 
-int main(){
+int main(){  
     MathFunc select; // Указатель на функцию
     if(!SelectFunction(&select)){
         std::cout << "Invalid function selection!" << "\n";
