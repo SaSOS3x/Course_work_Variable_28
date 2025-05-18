@@ -67,7 +67,6 @@ int SelectFunction(MathFunc* func) {
 void Integrate(Func f, const float* interval, const float iter, const float eps) {
     double integrate = 0.0;
     double mode = 0.0;
-    f.x = interval[0]; // 0 <- f.x, 1
 
     // Вычисление плотности вероятности функции на заданном интервале
     for ( f.x = interval[0]; f.x <= interval[1]; f.x += iter ){ // f.x <= 1 <- interval[1] {0, 1 <- [1]}
